@@ -34,8 +34,8 @@ This FX Trading Service provides a comprehensive platform for currency exchange 
 1. **Clone the repository**
 
    ```bash
-   git clone https://github.com/yourusername/fx-trading-service.git
-   cd fx-trading-service
+   git clone https://github.com/BigVeezus/fx-service.git
+   cd fx-service
    ```
 
 2. **Install dependencies**
@@ -61,6 +61,7 @@ This FX Trading Service provides a comprehensive platform for currency exchange 
    NODE_ENV=development
    PORT=3000
 
+
    # Database
    DB_HOST=localhost
    DB_PORT=5432
@@ -69,19 +70,22 @@ This FX Trading Service provides a comprehensive platform for currency exchange 
    DB_DATABASE=fx_trading
 
    # JWT
-   JWT_SECRET=your_jwt_secret_key
+   JWT_SECRET=fx_test
    JWT_EXPIRATION=86400
 
    # Email
    MAIL_HOST=smtp.gmail.com
    MAIL_PORT=587
-   MAIL_USER=your-email@gmail.com
-   MAIL_PASSWORD=your-app-password
-   MAIL_FROM=your-email@gmail.com
+   MAIL_SECURE=false
+   MAIL_USER=your_email@gmail.com
+   MAIL_PASS=your_email_app_password
+   MAIL_FROM_NAME=FX
+   MAIL_FROM_EMAIL=your_email@gmail.com
+   MAIL_FROM="Your App Name <your_gmail_address@gmail.com>"
 
    # FX API integration
-   FX_API_KEY=your_fx_api_key
-   FX_API_URL=https://api.fxprovider.com
+   EXCHANGE_RATE_API_URL=https://api.exchangerate-api.com/v4/latest
+   EXCHANGE_RATE_API_KEY=your_api_key
    ```
 
 5. **Start the application**
@@ -95,7 +99,11 @@ This FX Trading Service provides a comprehensive platform for currency exchange 
    npm run start:prod
    ```
 
-6. **Access the API**
+6. **To run tests**
+   npm run test
+   (tests for wallet service and fx service complete)
+
+7. **Access the API**
    The API will be available at `http://localhost:3000`
 
 ## Key Assumptions
@@ -108,7 +116,7 @@ This FX Trading Service provides a comprehensive platform for currency exchange 
 
 2. **Wallet Management**
 
-   - Users can have multiple currency wallets
+   - Users can have multiple currency wallets and have 4 wallets on creation
    - System prevents overdrafts (transactions are rejected if insufficient funds)
    - Wallet balances are updated atomically during transactions
 
@@ -116,12 +124,10 @@ This FX Trading Service provides a comprehensive platform for currency exchange 
 
    - Exchange rates are sourced from an external provider API
    - Exchange rates are cached with a configurable TTL
-   - Transactions include a spread/fee component configurable by admin
 
 4. **Notifications**
 
    - Email notifications for significant events (account creation, large transactions)
-   - In-app notifications for all transaction activities
    - Event-driven architecture for notification delivery
 
 5. **Data Persistence**
@@ -186,8 +192,8 @@ The system follows a modular, layered architecture:
 │                         API Gateway                           │
 │                                                               │
 │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────┐  │
-│  │ Auth    │  │ User    │  │ Wallet  │  │ FX      │  │ ...  │  │
-│  │ Routes  │  │ Routes  │  │ Routes  │  │ Routes  │  │     │  │
+│  │ Auth    │  │ User    │  │ Wallet  │  │ FX      │  │ Admin  │
+│  │ Routes  │  │ Routes  │  │ Routes  │  │ Routes  │  │ Routes │
 │  └─────────┘  └─────────┘  └─────────┘  └─────────┘  └─────┘  │
 │                                                               │
 └───────────────────────────────────────────────────────────────┘
@@ -199,8 +205,8 @@ The system follows a modular, layered architecture:
 │                        Business Logic Layer                   │
 │                                                               │
 │  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────────┐  ┌─────┐  │
-│  │ Auth    │  │ User    │  │ Wallet  │  │ FX      │  │     │  │
-│  │ Service │  │ Service │  │ Service │  │ Service │  │ ... │  │
+│  │ Auth    │  │ User    │  │ Wallet  │  │ FX      │  │ Admin  │
+│  │ Service │  │ Service │  │ Service │  │ Service │  │Service │
 │  └─────────┘  └─────────┘  └─────────┘  └─────────┘  └─────┘  │
 │                                                               │
 └───────────────────────────────────────────────────────────────┘
@@ -232,154 +238,239 @@ The system follows a modular, layered architecture:
 ### User Authentication Flow
 
 ```
-┌─────────┐        ┌─────────────┐        ┌─────────────┐        ┌─────────────┐
-│  Client │        │  Auth       │        │  User       │        │  Email      │
-│         │        │  Controller │        │  Service    │        │  Service    │
-└────┬────┘        └──────┬──────┘        └──────┬──────┘        └──────┬──────┘
-     │                    │                      │                      │
-     │ Register Request   │                      │                      │
-     │ ─────────────────> │                      │                      │
-     │                    │                      │                      │
-     │                    │ Create User          │                      │
-     │                    │ ─────────────────────>                      │
-     │                    │                      │                      │
-     │                    │                      │ Store User Data      │
-     │                    │                      │ ─────────────────────>
-     │                    │                      │                      │
-     │                    │                      │ <─────────────────────
-     │                    │                      │                      │
-     │                    │ <─────────────────────                      │
-     │                    │                      │                      │
-     │                    │ Send Welcome Email   │                      │
-     │                    │ ─────────────────────────────────────────────>
-     │                    │                      │                      │
-     │ Response with      │                      │                      │
-     │ JWT Token          │                      │                      │
-     │ <─────────────────────────────────────────────────────────────────
-     │                    │                      │                      │
-     │ Login Request      │                      │                      │
-     │ ─────────────────> │                      │                      │
-     │                    │                      │                      │
-     │                    │ Validate Credentials │                      │
-     │                    │ ─────────────────────>                      │
-     │                    │                      │                      │
-     │                    │ <─────────────────────                      │
-     │                    │                      │                      │
-     │ JWT Token          │                      │                      │
-     │ <─────────────────────────────────────────────────────────────────
-     │                    │                      │                      │
-┌────┴────┐        ┌──────┴──────┐        ┌──────┴──────┐        ┌──────┴──────┐
-│  Client │        │  Auth       │        │  User       │        │  Email      │
-│         │        │  Controller │        │  Service    │        │  Service    │
-└─────────┘        └─────────────┘        └─────────────┘        └─────────────┘
+┌─────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐
+│ Client │ │ Auth │ │ Auth │ │ User │ │ Wallet │ │ Notif. │
+│ │ │ Controller │ │ Service │ │ Service │ │ Service │ │ Service │
+└────┬────┘ └──────┬──────┘ └──────┬──────┘ └──────┬──────┘ └──────┬──────┘ └──────┬──────┘
+│ │ │ │ │ │
+│ Register Request │ │ │ │ │
+│ ─────────────────> │ │ │ │ │
+│ │ │ │ │ │
+│ │ register(dto) │ │ │ │
+│ │ ─────────────────────> │ │ │
+│ │ │ │ │ │
+│ │ │ findByEmail() │ │ │
+│ │ │ ─────────────────────> │ │
+│ │ │ │ │ │
+│ │ │ <───────────────────── │ │
+│ │ │ │ │ │
+│ │ │ create(user, otp) │ │ │
+│ │ │ ─────────────────────> │ │
+│ │ │ │ │ │
+│ │ │ <───────────────────── │ │
+│ │ │ │ │ │
+│ │ │ sendOtpEmail() │ │ │
+│ │ │ ───────────────────────────────────────────────────────────────────>
+│ │ │ │ │ │
+│ │ <───────────────────── │ │ │
+│ │ │ │ │ │
+│ Registration │ │ │ │ │
+│ Success │ │ │ │ │
+│ <───────────────────────────────────────────────────────────────────────────────────────── │
+│ │ │ │ │ │
+│ Verify OTP Request │ │ │ │ │
+│ ─────────────────> │ │ │ │ │
+│ │ │ │ │ │
+│ │ verifyOtp(dto) │ │ │ │
+│ │ ─────────────────────> │ │ │
+│ │ │ │ │ │
+│ │ │ findByEmail() │ │ │
+│ │ │ ─────────────────────> │ │
+│ │ │ │ │ │
+│ │ │ <───────────────────── │ │
+│ │ │ │ │ │
+│ │ │ update(verified) │ │ │
+│ │ │ ─────────────────────> │ │
+│ │ │ │ │ │
+│ │ │ <───────────────────── │ │
+│ │ │ │ │ │
+│ │ │ createDefaultWallets() │ │
+│ │ │ ─────────────────────────────────────────────> │
+│ │ │ │ │ │
+│ │ │ <───────────────────────────────────────────── │
+│ │ │ │ │ │
+│ │ <───────────────────── │ │ │
+│ │ │ │ │ │
+│ JWT Token │ │ │ │ │
+│ <───────────────────────────────────────────────────────────────────────────────────────── │
+│ │ │ │ │ │
+│ Login Request │ │ │ │ │
+│ ─────────────────> │ │ │ │ │
+│ │ │ │ │ │
+│ │ login(dto) │ │ │ │
+│ │ ─────────────────────> │ │ │
+│ │ │ │ │ │
+│ │ │ findByEmail() │ │ │
+│ │ │ ─────────────────────> │ │
+│ │ │ │ │ │
+│ │ │ <───────────────────── │ │
+│ │ │ │ │ │
+│ │ <───────────────────── │ │ │
+│ │ │ │ │ │
+│ JWT Token │ │ │ │ │
+│ <───────────────────────────────────────────────────────────────────────────────────────── │
+│ │ │ │ │ │
+│ Resend OTP Request │ │ │ │ │
+│ ─────────────────> │ │ │ │ │
+│ │ │ │ │ │
+│ │ resendOtp(email) │ │ │ │
+│ │ ─────────────────────> │ │ │
+│ │ │ │ │ │
+│ │ │ findByEmail() │ │ │
+│ │ │ ─────────────────────> │ │
+│ │ │ │ │ │
+│ │ │ <───────────────────── │ │
+│ │ │ │ │ │
+│ │ │ update(new OTP) │ │ │
+│ │ │ ─────────────────────> │ │
+│ │ │ │ │ │
+│ │ │ <───────────────────── │ │
+│ │ │ │ │ │
+│ │ │ sendOtpEmail() │ │ │
+│ │ │ ───────────────────────────────────────────────────────────────────>
+│ │ │ │ │ │
+│ │ <───────────────────── │ │ │
+│ │ │ │ │ │
+│ OTP Sent Success │ │ │ │ │
+│ <───────────────────────────────────────────────────────────────────────────────────────── │
+│ │ │ │ │ │
+┌────┴────┐ ┌──────┴──────┐ ┌──────┴──────┐ ┌──────┴──────┐ ┌──────┴──────┐ ┌──────┴──────┐
+│ Client │ │ Auth │ │ Auth │ │ User │ │ Wallet │ │ Notif. │
+│ │ │ Controller │ │ Service │ │ Service │ │ Service │ │ Service │
+└─────────┘ └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘
 ```
 
 ### FX Trading Flow
 
 ```
-┌─────────┐        ┌─────────────┐        ┌─────────────┐        ┌─────────────┐        ┌─────────────┐
-│  Client │        │  FX         │        │  Wallet     │        │  External   │        │  Notif.     │
-│         │        │  Controller │        │  Service    │        │  FX API     │        │  Service    │
-└────┬────┘        └──────┬──────┘        └──────┬──────┘        └──────┬──────┘        └──────┬──────┘
-     │                    │                      │                      │                      │
-     │ Exchange Request   │                      │                      │                      │
-     │ ─────────────────> │                      │                      │                      │
-     │                    │                      │                      │                      │
-     │                    │ Get Exchange Rate    │                      │                      │
-     │                    │ ───────────────────────────────────────────> │                      │
-     │                    │                      │                      │                      │
-     │                    │ <───────────────────────────────────────────                      │
-     │                    │                      │                      │                      │
-     │                    │ Check Source Wallet  │                      │                      │
-     │                    │ ─────────────────────>                      │                      │
-     │                    │                      │                      │                      │
-     │                    │ <─────────────────────                      │                      │
-     │                    │                      │                      │                      │
-     │                    │ Debit Source Wallet  │                      │                      │
-     │                    │ ─────────────────────>                      │                      │
-     │                    │                      │                      │                      │
-     │                    │ <─────────────────────                      │                      │
-     │                    │                      │                      │                      │
-     │                    │ Credit Target Wallet │                      │                      │
-     │                    │ ─────────────────────>                      │                      │
-     │                    │                      │                      │                      │
-     │                    │ <─────────────────────                      │                      │
-     │                    │                      │                      │                      │
-     │                    │ Record Transaction   │                      │                      │
-     │                    │ ─────────────────────>                      │                      │
-     │                    │                      │                      │                      │
-     │                    │ <─────────────────────                      │                      │
-     │                    │                      │                      │                      │
-     │                    │ Send Notification    │                      │                      │
-     │                    │ ───────────────────────────────────────────────────────────────────>
-     │                    │                      │                      │                      │
-     │ Exchange Response  │                      │                      │                      │
-     │ <─────────────────────────────────────────────────────────────────                      │
-     │                    │                      │                      │                      │
-┌────┴────┐        ┌──────┴──────┐        ┌──────┴──────┐        ┌──────┴──────┐        ┌──────┴──────┐
-│  Client │        │  FX         │        │  Wallet     │        │  External   │        │  Notif.     │
-│         │        │  Controller │        │  Service    │        │  FX API     │        │  Service    │
-└─────────┘        └─────────────┘        └─────────────┘        └─────────────┘        └─────────────┘
+┌─────────┐        ┌─────────────┐        ┌─────────────┐        ┌────────────────┐        ┌─────────────┐
+│  Client │        │  FX         │        │  Cache      │        │  External FX   │        │  Database   │
+│         │        │  Service    │        │  Manager     │        │  API           │        │  (Exchange  │
+└────┬────┘        └──────┬──────┘        └──────┬──────┘        └──────┬──────────┘        │  Rates)     │
+     │                    │                      │                      │                    └────┬──────┘
+     │ Convert Request    │                      │                      │                         │
+     │ ─────────────────> │                      │                      │                         │
+     │                    │ Check Cache          │                      │                         │
+     │                    │ ─────────────────────>                      │                         │
+     │                    │                      │                      │                         │
+     │                    │ <────── Cache Hit ────                      │                         │
+     │                    │      or Cache Miss                          │                         │
+     │                    │                      │                      │                         │
+     │                    │ ┌──────────────────────────────────────────>│                         │
+     │                    │ │ Fetch Rates From External API             │                         │
+     │                    │ │                                           │                         │
+     │                    │ │ <─────────────────────────────────────────┘                         │
+     │                    │ │                                           │                         │
+     │                    │ └────── Store in DB (Background) ───────────────────────────────────> │
+     │                    │                                           │                         │
+     │                    │                                           │                         │
+     │                    │          or API Failed                    │                         │
+     │                    │ ───────> Get Fallback From DB ─────────────────────────────────────> │
+     │                    │                                           │                         │
+     │                    │ <────────────────────────────────────────────────────────────────────┘
+     │                    │                                           │
+     │                    │ Perform Conversion                        │
+     │                    │ ────────────────────────────────────────────────────────────────────▶
+     │                    │                                           │
+     │                    │ Return { convertedAmount, rate }         │
+     │ <──────────────────┘                                           │
+     │
 ```
 
 ### Wallet Management Flow
 
 ```
-┌─────────┐        ┌─────────────┐        ┌─────────────┐        ┌─────────────┐
-│  Client │        │  Wallet     │        │  Transaction│        │  Notif.     │
-│         │        │  Controller │        │  Service    │        │  Service    │
-└────┬────┘        └──────┬──────┘        └──────┬──────┘        └──────┬──────┘
-     │                    │                      │                      │
-     │ Create Wallet      │                      │                      │
-     │ ─────────────────> │                      │                      │
-     │                    │                      │                      │
-     │                    │ Create Wallet        │                      │
-     │                    │ ─────────────────────>                      │
-     │                    │                      │                      │
-     │                    │ <─────────────────────                      │
-     │                    │                      │                      │
-     │ Wallet Created     │                      │                      │
-     │ <─────────────────────────────────────────                      │
-     │                    │                      │                      │
-     │ Deposit Request    │                      │                      │
-     │ ─────────────────> │                      │                      │
-     │                    │                      │                      │
-     │                    │ Process Deposit      │                      │
-     │                    │ ─────────────────────>                      │
-     │                    │                      │                      │
-     │                    │ Record Transaction   │                      │
-     │                    │ ─────────────────────>                      │
-     │                    │                      │                      │
-     │                    │ <─────────────────────                      │
-     │                    │                      │                      │
-     │                    │ Send Notification    │                      │
-     │                    │ ───────────────────────────────────────────> │
-     │                    │                      │                      │
-     │ Deposit Confirmed  │                      │                      │
-     │ <─────────────────────────────────────────────────────────────────
-     │                    │                      │                      │
-     │ Withdrawal Request │                      │                      │
-     │ ─────────────────> │                      │                      │
-     │                    │                      │                      │
-     │                    │ Check Balance        │                      │
-     │                    │ ─────────────────────>                      │
-     │                    │                      │                      │
-     │                    │ Process Withdrawal   │                      │
-     │                    │ ─────────────────────>                      │
-     │                    │                      │                      │
-     │                    │ Record Transaction   │                      │
-     │                    │ ─────────────────────>                      │
-     │                    │                      │                      │
-     │                    │ <─────────────────────                      │
-     │                    │                      │                      │
-     │                    │ Send Notification    │                      │
-     │                    │ ───────────────────────────────────────────> │
-     │                    │                      │                      │
-     │ Withdrawal Confirmed                      │                      │
-     │ <─────────────────────────────────────────────────────────────────
-     │                    │                      │                      │
-┌────┴────┐        ┌──────┴──────┐        ┌──────┴──────┐        ┌──────┴──────┐
-│  Client │        │  Wallet     │        │  Transaction│        │  Notif.     │
-│         │        │  Controller │        │  Service    │        │  Service    │
-└─────────┘        └─────────────┘        └─────────────┘        └─────────────┘
+┌─────────┐        ┌─────────────┐        ┌─────────────┐        ┌─────────────┐        ┌─────────────┐
+│  Client │        │  Wallet     │        │  Wallet     │        │  Transaction│        │  Event      │
+│         │        │  Controller │        │  Service    │        │  Service    │        │  Emitter    │
+└────┬────┘        └──────┬──────┘        └──────┬──────┘        └──────┬──────┘        └──────┬──────┘
+     │                    │                      │                      │                      │
+     │ Create Default     │                      │                      │                      │
+     │ Wallets            │                      │                      │                      │
+     │ ─────────────────> │                      │                      │                      │
+     │                    │                      │                      │                      │
+     │                    │ createDefaultWallets │                      │                      │
+     │                    │ ─────────────────────>                      │                      │
+     │                    │                      │                      │                      │
+     │                    │                      │ Create Wallets       │                      │
+     │                    │                      │ For All Currencies   │                      │
+     │                    │                      │ ───────────────────> │                      │
+     │                    │                      │                      │                      │
+     │                    │                      │ <───────────────────                       │
+     │                    │ <─────────────────────                      │                      │
+     │ Wallets Created    │                      │                      │                      │
+     │ <─────────────────────────────────────────                      │                      │
+     │                    │                      │                      │                      │
+     │ Fund Wallet        │                      │                      │                      │
+     │ ─────────────────> │                      │                      │                      │
+     │                    │                      │                      │                      │
+     │                    │ fundWallet           │                      │                      │
+     │                    │ ─────────────────────>                      │                      │
+     │                    │                      │                      │                      │
+     │                    │                      │ Validate & Update    │                      │
+     │                    │                      │ Wallet Balance       │                      │
+     │                    │                      │                      │                      │
+     │                    │                      │ Create Transaction   │                      │
+     │                    │                      │ ───────────────────> │                      │
+     │                    │                      │                      │                      │
+     │                    │                      │ <───────────────────                       │
+     │                    │                      │                      │                      │
+     │                    │                      │ Emit wallet.funded   │                      │
+     │                    │                      │ ─────────────────────────────────────────> │
+     │                    │                      │                      │                      │
+     │                    │ <─────────────────────                      │                      │
+     │ Funding Successful │                      │                      │                      │
+     │ <─────────────────────────────────────────                      │                      │
+     │                    │                      │                      │                      │
+     │ Convert Currency   │                      │                      │                      │
+     │ ─────────────────> │                      │                      │                      │
+     │                    │                      │                      │                      │
+     │                    │ convertCurrency      │                      │                      │
+     │                    │ ─────────────────────>                      │                      │
+     │                    │                      │                      │                      │
+     │                    │                      │ Check Balances &     │                      │
+     │                    │                      │ Get Exchange Rate    │                      │
+     │                    │                      │                      │                      │
+     │                    │                      │ Update Both Wallets  │                      │
+     │                    │                      │                      │                      │
+     │                    │                      │ Create Transaction   │                      │
+     │                    │                      │ ───────────────────> │                      │
+     │                    │                      │                      │                      │
+     │                    │                      │ <───────────────────                       │
+     │                    │                      │                      │                      │
+     │                    │                      │ Emit Conversion Event│                      │
+     │                    │                      │ ─────────────────────────────────────────> │
+     │                    │                      │                      │                      │
+     │                    │ <─────────────────────                      │                      │
+     │ Conversion Success │                      │                      │                      │
+     │ <─────────────────────────────────────────                      │                      │
+     │                    │                      │                      │                      │
+     │ Trade Currency     │                      │                      │                      │
+     │ ─────────────────> │                      │                      │                      │
+     │                    │                      │                      │                      │
+     │                    │ tradeCurrency        │                      │                      │
+     │                    │ ─────────────────────>                      │                      │
+     │                    │                      │                      │                      │
+     │                    │                      │ Validate NGN Req &   │                      │
+     │                    │                      │ Check Balances       │                      │
+     │                    │                      │                      │                      │
+     │                    │                      │ Get Exchange Rate    │                      │
+     │                    │                      │                      │                      │
+     │                    │                      │ Update Both Wallets  │                      │
+     │                    │                      │                      │                      │
+     │                    │                      │ Create Transaction   │                      │
+     │                    │                      │ ───────────────────> │                      │
+     │                    │                      │                      │                      │
+     │                    │                      │ <───────────────────                       │
+     │                    │                      │                      │                      │
+     │                    │                      │ Emit Trade Event     │                      │
+     │                    │                      │ ─────────────────────────────────────────> │
+     │                    │                      │                      │                      │
+     │                    │ <─────────────────────                      │                      │
+     │ Trade Successful   │                      │                      │                      │
+     │ <─────────────────────────────────────────                      │                      │
+┌────┴────┐        ┌──────┴──────┐        ┌──────┴──────┐        ┌──────┴──────┐        ┌──────┴──────┐
+│  Client │        │  Wallet     │        │  Wallet     │        │  Transaction│        │  Event      │
+│         │        │  Controller │        │  Service    │        │  Service    │        │  Emitter    │
+└─────────┘        └─────────────┘        └─────────────┘        └─────────────┘        └─────────────┘
 ```

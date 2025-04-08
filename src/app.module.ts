@@ -13,6 +13,7 @@ import { MailerModule } from '@nestjs-modules/mailer';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/dist/adapters/handlebars.adapter';
 import { join } from 'path';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { AdminModule } from './modules/admin/admin.module';
 
 @Module({
   imports: [
@@ -77,6 +78,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     FxModule,
     TransactionModule,
     NotificationModule,
+    AdminModule,
     EventEmitterModule.forRoot(),
   ],
   controllers: [],

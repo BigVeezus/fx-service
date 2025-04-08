@@ -23,11 +23,13 @@ export class FxService {
     private configService: ConfigService,
     @Inject(CACHE_MANAGER) private cacheManager: Cache,
   ) {
-    this.apiUrl = this.configService.get<string>(
+    this.apiUrl = this.configService.getOrThrow<string>(
       'EXCHANGE_RATE_API_URL',
       'https://api.exchangerate-api.com/v4/latest',
     );
-    this.apiKey = this.configService.get<string>('EXCHANGE_RATE_API_KEY');
+    this.apiKey = this.configService.getOrThrow<string>(
+      'EXCHANGE_RATE_API_KEY',
+    );
   }
 
   async getAllRates(): Promise<any> {
@@ -151,9 +153,11 @@ export class FxService {
 
       // Filter only supported currencies
       const filteredRates = {};
-      for (const currency of this.supportedCurrencies) {
-        if (data.rates && data.rates[currency]) {
-          filteredRates[currency] = data.rates[currency];
+      if (data && data.rates) {
+        for (const currency of this.supportedCurrencies) {
+          if (data.rates[currency]) {
+            filteredRates[currency] = data.rates[currency];
+          }
         }
       }
 

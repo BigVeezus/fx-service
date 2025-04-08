@@ -81,6 +81,13 @@ export class WalletService {
   async fundWallet(userId: string, fundDto: FundWalletDto): Promise<any> {
     let { currency, amount } = fundDto;
 
+    let wallet = await this.walletRepository.findOne({ where: { currency } });
+
+    if (!wallet) {
+      // Manually create the wallet if it doesn't exist (for testing purposes)
+      wallet = await this.walletRepository.save({ currency, balance: 0 });
+    }
+
     if (amount <= 0) {
       throw new BadRequestException('Amount must be greater than zero');
     }
