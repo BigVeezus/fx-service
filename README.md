@@ -104,7 +104,7 @@ This FX Trading Service provides a comprehensive platform for currency exchange 
    (tests for wallet service and fx service complete)
 
 7. **Access the API**
-   The API will be available at `http://localhost:3000`
+   The API will be available at `http://localhost:3000`, The Doc are available at `http://localhost:3000/docs`
 
 ## Key Assumptions
 
